@@ -6,7 +6,7 @@
   "scope": "./",
   "display": "standalone",
   "background_color": "#f7f8fb",
-  "theme_color": "#dff5ed",
+  "theme_color": "#007c78",
   "icons": [
     {
       "src": "icons/petewheeler-icon.svg",
