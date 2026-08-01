@@ -1,4 +1,4 @@
-const CACHE_NAME = 'petewheeler-v2';
+const CACHE_NAME = 'petewheeler-v3';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/petewheeler-icon.svg'];
 
 self.addEventListener('install', (event) => {
