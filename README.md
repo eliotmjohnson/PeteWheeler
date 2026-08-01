@@ -1,4 +1,4 @@
-# Wheel Basis Tracker
+# PeteWheeler
 
 A mobile-first React app for tracking wheel strategy option trades and adjusted share cost.
 

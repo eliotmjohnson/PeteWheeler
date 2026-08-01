@@ -789,7 +789,7 @@ function DataActions({ positions, onImport, onReset }) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `wheel-basis-${today()}.json`;
+    anchor.download = `PeteWheeler-${today()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -907,7 +907,7 @@ export default function App() {
             <LineChart size={24} />
           </div>
           <div>
-            <p>Wheel Basis</p>
+            <p>PeteWheeler</p>
             <h1>Options cost tracker</h1>
           </div>
         </div>
