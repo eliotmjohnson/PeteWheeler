@@ -31,7 +31,7 @@
 
 html {
     min-height: 100%;
-    background: var(--teal);
+    background: #e5f6f1;
     overscroll-behavior-y: none;
     overflow-anchor: none;
 }
@@ -43,8 +43,8 @@ body {
     background:
         linear-gradient(
             180deg,
-            var(--teal) 0,
-            var(--teal) env(safe-area-inset-top),
+            #e5f6f1 0,
+            #e5f6f1 env(safe-area-inset-top),
             transparent env(safe-area-inset-top)
         ),
         linear-gradient(180deg, rgba(223, 245, 237, 0.75), rgba(247, 248, 251, 0) 280px),
