@@ -1,6 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#007c78"/>
-  <circle cx="256" cy="256" r="166" fill="#dff5ed"/>
-  <path fill="#007c78" d="M173 150h99c55 0 91 28 91 74 0 35-21 60-57 69l69 69-37 37-83-84h-35v84h-52V150zm52 47v72h44c26 0 42-13 42-36 0-23-16-36-42-36h-44z"/>
-  <path d="M169 354c45 32 129 35 177-4" fill="none" stroke="#d95d45" stroke-linecap="round" stroke-width="24"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>PeteWheeler options wheel monogram</title>
+  <defs>
+    <linearGradient id="blue" x1="76" y1="48" x2="432" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2997ff"/>
+      <stop offset="1" stop-color="#007aff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#blue)"/>
+  <g transform="translate(256 256) scale(1.45) translate(-256 -256)">
+    <path d="M128 187A156 156 0 0 1 390 157" fill="none" stroke="rgba(255,255,255,.34)" stroke-linecap="round" stroke-width="16"/>
+    <path d="m372 129 27 34-43 9" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+    <path d="M384 325A156 156 0 0 1 123 355" fill="none" stroke="rgba(231,242,255,.7)" stroke-linecap="round" stroke-width="16"/>
+    <path d="m141 383-28-34 43-9" fill="none" stroke="#e7f2ff" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/>
+  </g>
+  <text x="256" y="372" fill="#34c759" font-family="Arial Rounded MT Bold, Arial, sans-serif" font-size="340" font-weight="800" text-anchor="middle">$</text>
+  <g transform="translate(256 256) scale(.82) translate(-310.5 -271.5)">
+    <path fill="#fff" d="M112 138h100c62 0 104 37 104 96s-42 97-104 97h-42v74h-58V138Zm58 50v94h39c31 0 49-16 49-47s-18-47-49-47h-39Z"/>
+    <path fill="#e7f2ff" d="M272 191h55l25 119 32-79h38l32 79 25-119h55l-44 190h-53l-34-83-34 83h-53l-44-190Z"/>
+  </g>
 </svg>

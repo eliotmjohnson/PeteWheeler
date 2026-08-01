@@ -1,130 +1,141 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
   BadgeDollarSign,
   CalendarDays,
+  ChartNoAxesCombined,
   CheckCircle2,
   Download,
   LineChart,
   ListPlus,
+  List,
+  MoreHorizontal,
   Plus,
   RotateCcw,
   ShieldCheck,
   Trash2,
   Upload,
   WalletCards,
-} from 'lucide-react';
+  House,
+} from "lucide-react";
 
-const STORAGE_KEY = 'wheel-cost-tracker:v1';
+const STORAGE_KEY = "wheel-cost-tracker:v1";
 const CONTRACT_SIZE = 100;
 
 const TRADE_TYPES = {
   sell_put: {
-    label: 'Sell put',
-    shortLabel: 'STO put',
-    side: 'credit',
+    label: "Sell put",
+    shortLabel: "STO put",
+    side: "credit",
     option: true,
     icon: ArrowDownToLine,
   },
   buy_put: {
-    label: 'Buy back put',
-    shortLabel: 'BTC put',
-    side: 'debit',
+    label: "Buy back put",
+    shortLabel: "BTC put",
+    side: "debit",
     option: true,
     icon: ArrowUpFromLine,
   },
   assignment: {
-    label: 'Assigned shares',
-    shortLabel: 'Assigned',
-    side: 'debit',
+    label: "Assigned shares",
+    shortLabel: "Assigned",
+    side: "debit",
     option: false,
     icon: CheckCircle2,
   },
   sell_call: {
-    label: 'Sell call',
-    shortLabel: 'STO call',
-    side: 'credit',
+    label: "Sell call",
+    shortLabel: "STO call",
+    side: "credit",
     option: true,
     icon: ArrowDownToLine,
   },
   buy_call: {
-    label: 'Buy back call',
-    shortLabel: 'BTC call',
-    side: 'debit',
+    label: "Buy back call",
+    shortLabel: "BTC call",
+    side: "debit",
     option: true,
     icon: ArrowUpFromLine,
   },
   called_away: {
-    label: 'Called away',
-    shortLabel: 'Called',
-    side: 'credit',
+    label: "Called away",
+    shortLabel: "Called",
+    side: "credit",
     option: false,
     icon: ShieldCheck,
   },
 };
 
-const TYPE_ORDER = ['sell_put', 'buy_put', 'assignment', 'sell_call', 'buy_call', 'called_away'];
+const TYPE_ORDER = [
+  "sell_put",
+  "buy_put",
+  "assignment",
+  "sell_call",
+  "buy_call",
+  "called_away",
+];
 
 const SAMPLE_POSITION = {
-  id: 'sample-aapl',
-  symbol: 'AAPL',
-  createdAt: '2026-07-01T10:00:00.000Z',
+  id: "sample-aapl",
+  symbol: "AAPL",
+  createdAt: "2026-07-01T10:00:00.000Z",
   events: [
     {
-      id: 'sample-1',
-      type: 'sell_put',
-      date: '2026-07-03',
+      id: "sample-1",
+      type: "sell_put",
+      date: "2026-07-03",
       contracts: 1,
       shares: 100,
       strike: 195,
       premium: 2.4,
       fees: 0.65,
-      note: 'Opened cash-secured put',
+      note: "Opened cash-secured put",
     },
     {
-      id: 'sample-2',
-      type: 'buy_put',
-      date: '2026-07-10',
+      id: "sample-2",
+      type: "buy_put",
+      date: "2026-07-10",
       contracts: 1,
       shares: 100,
       strike: 195,
       premium: 0.8,
       fees: 0.65,
-      note: 'Rolled early',
+      note: "Rolled early",
     },
     {
-      id: 'sample-3',
-      type: 'sell_put',
-      date: '2026-07-10',
+      id: "sample-3",
+      type: "sell_put",
+      date: "2026-07-10",
       contracts: 1,
       shares: 100,
       strike: 190,
       premium: 3.1,
       fees: 0.65,
-      note: 'Opened next put',
+      note: "Opened next put",
     },
     {
-      id: 'sample-4',
-      type: 'assignment',
-      date: '2026-07-24',
+      id: "sample-4",
+      type: "assignment",
+      date: "2026-07-24",
       contracts: 1,
       shares: 100,
       strike: 190,
       premium: 0,
       fees: 0,
-      note: 'Assigned 100 shares',
+      note: "Assigned 100 shares",
     },
     {
-      id: 'sample-5',
-      type: 'sell_call',
-      date: '2026-07-27',
+      id: "sample-5",
+      type: "sell_call",
+      date: "2026-07-27",
       contracts: 1,
       shares: 100,
       strike: 192.5,
       premium: 1.15,
       fees: 0.65,
-      note: 'First covered call',
+      note: "First covered call",
     },
   ],
 };
@@ -132,40 +143,42 @@ const SAMPLE_POSITION = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 const emptyEventForm = () => ({
-  type: 'sell_put',
+  type: "sell_put",
   date: today(),
-  contracts: '1',
-  shares: '100',
-  strike: '',
-  premium: '',
-  fees: '0',
-  note: '',
+  contracts: "1",
+  shares: "100",
+  strike: "",
+  premium: "",
+  fees: "0",
+  note: "",
 });
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
   maximumFractionDigits: 2,
 });
 
-const compactCurrencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  notation: 'compact',
+const compactCurrencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
   maximumFractionDigits: 1,
 });
 
-const numberFormatter = new Intl.NumberFormat('en-US', {
+const numberFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
 function formatCurrency(value, compact = false) {
-  if (!Number.isFinite(value)) return '--';
-  return compact ? compactCurrencyFormatter.format(value) : currencyFormatter.format(value);
+  if (!Number.isFinite(value)) return "--";
+  return compact
+    ? compactCurrencyFormatter.format(value)
+    : currencyFormatter.format(value);
 }
 
 function formatNumber(value) {
-  if (!Number.isFinite(value)) return '--';
+  if (!Number.isFinite(value)) return "--";
   return numberFormatter.format(value);
 }
 
@@ -174,8 +187,10 @@ function parseNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function makeId(prefix = 'id') {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+function makeId(prefix = "id") {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }
 
 function getShares(event) {
@@ -185,7 +200,9 @@ function getShares(event) {
 }
 
 function optionCredit(event) {
-  return parseNumber(event.premium) * parseNumber(event.contracts) * CONTRACT_SIZE;
+  return (
+    parseNumber(event.premium) * parseNumber(event.contracts) * CONTRACT_SIZE
+  );
 }
 
 function optionFees(event) {
@@ -198,15 +215,15 @@ function eventCashFlow(event) {
   const shares = getShares(event);
 
   switch (event.type) {
-    case 'sell_put':
-    case 'sell_call':
+    case "sell_put":
+    case "sell_call":
       return optionCredit(event) - optionFees(event);
-    case 'buy_put':
-    case 'buy_call':
+    case "buy_put":
+    case "buy_call":
       return -(optionCredit(event) + optionFees(event));
-    case 'assignment':
+    case "assignment":
       return -(strike * shares + fees);
-    case 'called_away':
+    case "called_away":
       return strike * shares - fees;
     default:
       return 0;
@@ -214,20 +231,31 @@ function eventCashFlow(event) {
 }
 
 function eventOptionNet(event) {
-  if (event.type === 'sell_put' || event.type === 'sell_call') return optionCredit(event) - optionFees(event);
-  if (event.type === 'buy_put' || event.type === 'buy_call') return -(optionCredit(event) + optionFees(event));
+  if (event.type === "sell_put" || event.type === "sell_call")
+    return optionCredit(event) - optionFees(event);
+  if (event.type === "buy_put" || event.type === "buy_call")
+    return -(optionCredit(event) + optionFees(event));
   return 0;
 }
 
 function eventSortValue(event, index) {
-  const dateValue = new Date(`${event.date || '1970-01-01'}T00:00:00`).getTime();
-  return `${String(dateValue).padStart(16, '0')}-${String(index).padStart(8, '0')}`;
+  const dateValue = new Date(
+    `${event.date || "1970-01-01"}T00:00:00`
+  ).getTime();
+  return `${String(dateValue).padStart(16, "0")}-${String(index).padStart(
+    8,
+    "0"
+  )}`;
 }
 
 function analyzePosition(position) {
   const events = [...(position.events || [])]
     .map((event, index) => ({ event, index }))
-    .sort((a, b) => eventSortValue(a.event, a.index).localeCompare(eventSortValue(b.event, b.index)))
+    .sort((a, b) =>
+      eventSortValue(a.event, a.index).localeCompare(
+        eventSortValue(b.event, b.index)
+      )
+    )
     .map(({ event }) => event);
 
   const totals = {
@@ -253,53 +281,77 @@ function analyzePosition(position) {
 
     totals.totalCashFlow += eventCashFlow(event);
 
-    if (event.type === 'sell_put') {
+    if (event.type === "sell_put") {
       totals.putPremium += optionNet;
       totals.soldPutContracts += contracts;
     }
 
-    if (event.type === 'buy_put') {
+    if (event.type === "buy_put") {
       totals.putPremium += optionNet;
       totals.boughtPutContracts += contracts;
     }
 
-    if (event.type === 'assignment') {
+    if (event.type === "assignment") {
       totals.assignmentCost += strike * shares + fees;
       totals.assignedShares += shares;
     }
 
-    if (event.type === 'sell_call') {
+    if (event.type === "sell_call") {
       totals.callPremium += optionNet;
       totals.soldCallContracts += contracts;
     }
 
-    if (event.type === 'buy_call') {
+    if (event.type === "buy_call") {
       totals.callPremium += optionNet;
       totals.boughtCallContracts += contracts;
     }
 
-    if (event.type === 'called_away') {
+    if (event.type === "called_away") {
       totals.calledAwayProceeds += strike * shares - fees;
       totals.calledAwayShares += shares;
     }
   });
 
-  const currentShares = Math.max(0, totals.assignedShares - totals.calledAwayShares);
+  const currentShares = Math.max(
+    0,
+    totals.assignedShares - totals.calledAwayShares
+  );
   const assignedPutContracts = totals.assignedShares / CONTRACT_SIZE;
-  const openPutContracts = Math.max(0, totals.soldPutContracts - totals.boughtPutContracts - assignedPutContracts);
-  const openCallContracts = Math.max(0, totals.soldCallContracts - totals.boughtCallContracts - totals.calledAwayShares / CONTRACT_SIZE);
+  const openPutContracts = Math.max(
+    0,
+    totals.soldPutContracts - totals.boughtPutContracts - assignedPutContracts
+  );
+  const openCallContracts = Math.max(
+    0,
+    totals.soldCallContracts -
+      totals.boughtCallContracts -
+      totals.calledAwayShares / CONTRACT_SIZE
+  );
   const netPremium = totals.putPremium + totals.callPremium;
-  const averageAssignedStrike = totals.assignedShares > 0 ? totals.assignmentCost / totals.assignedShares : null;
-  const assignmentBasis = totals.assignedShares > 0 ? (totals.assignmentCost - totals.putPremium) / totals.assignedShares : null;
-  const adjustedBasis = totals.assignedShares > 0 ? (totals.assignmentCost - netPremium) / totals.assignedShares : null;
+  const averageAssignedStrike =
+    totals.assignedShares > 0
+      ? totals.assignmentCost / totals.assignedShares
+      : null;
+  const assignmentBasis =
+    totals.assignedShares > 0
+      ? (totals.assignmentCost - totals.putPremium) / totals.assignedShares
+      : null;
+  const adjustedBasis =
+    totals.assignedShares > 0
+      ? (totals.assignmentCost - netPremium) / totals.assignedShares
+      : null;
   const closedWheelPnl =
-    totals.assignedShares > 0 && currentShares === 0 && totals.calledAwayShares > 0 ? totals.totalCashFlow : null;
+    totals.assignedShares > 0 &&
+    currentShares === 0 &&
+    totals.calledAwayShares > 0
+      ? totals.totalCashFlow
+      : null;
 
-  let status = 'Watching';
-  if (currentShares > 0) status = 'Assigned';
-  else if (closedWheelPnl !== null) status = 'Closed';
-  else if (openPutContracts > 0) status = 'Put phase';
-  else if (openCallContracts > 0) status = 'Call phase';
+  let status = "Watching";
+  if (currentShares > 0) status = "Assigned";
+  else if (closedWheelPnl !== null) status = "Closed";
+  else if (openPutContracts > 0) status = "Put phase";
+  else if (openCallContracts > 0) status = "Call phase";
 
   return {
     events,
@@ -335,7 +387,7 @@ function summarizePortfolio(positions) {
       assignedPositions: 0,
       openPutContracts: 0,
       closedWheelPnl: 0,
-    },
+    }
   );
 }
 
@@ -356,7 +408,7 @@ function useLocalStorage(key, initialValue) {
   return [value, setValue];
 }
 
-function Metric({ icon: Icon, label, value, subValue, tone = 'neutral' }) {
+function Metric({ icon: Icon, label, value, subValue, tone = "neutral" }) {
   return (
     <article className={`metric metric-${tone}`}>
       <div className="metric-icon" aria-hidden="true">
@@ -378,7 +430,10 @@ function EmptyState({ onLoadSample }) {
         <WalletCards size={34} />
       </div>
       <h2>No positions yet</h2>
-      <p>Add a ticker, record its transactions, and track its adjusted share cost automatically.</p>
+      <p>
+        Add a ticker, record its transactions, and track its adjusted share cost
+        automatically.
+      </p>
       <button className="secondary-button" type="button" onClick={onLoadSample}>
         <ListPlus size={18} />
         Load sample
@@ -389,7 +444,7 @@ function EmptyState({ onLoadSample }) {
 
 function PositionCreator({ onCreate }) {
   const [draft, setDraft] = useState({
-    symbol: '',
+    symbol: "",
   });
 
   const updateDraft = (key, value) => {
@@ -402,14 +457,14 @@ function PositionCreator({ onCreate }) {
     if (!symbol) return;
 
     onCreate({
-      id: makeId('position'),
+      id: makeId("position"),
       symbol,
       createdAt: new Date().toISOString(),
       events: [],
     });
 
     setDraft({
-      symbol: '',
+      symbol: "",
     });
   };
 
@@ -421,11 +476,15 @@ function PositionCreator({ onCreate }) {
           inputMode="text"
           autoCapitalize="characters"
           value={draft.symbol}
-          onChange={(event) => updateDraft('symbol', event.target.value)}
+          onChange={(event) => updateDraft("symbol", event.target.value)}
           placeholder="AAPL"
         />
       </label>
-      <button type="submit" className="primary-button" aria-label="Create position">
+      <button
+        type="submit"
+        className="primary-button"
+        aria-label="Create position"
+      >
         <Plus size={18} />
         Add
       </button>
@@ -442,17 +501,25 @@ function PositionList({ positions, activeId, onSelect, onDelete }) {
 
         return (
           <article
-            className={`position-row ${isActive ? 'is-active' : ''}`}
+            className={`position-row ${isActive ? "is-active" : ""}`}
             key={position.id}
           >
-            <button className="position-select" type="button" onClick={() => onSelect(position.id)}>
+            <button
+              className="position-select"
+              type="button"
+              onClick={() => onSelect(position.id)}
+            >
               <span className="position-main">
                 <strong>{position.symbol}</strong>
                 <small>{analysis.status}</small>
               </span>
               <span className="position-side">
                 <span>{formatNumber(analysis.events.length)} transactions</span>
-                <small>{analysis.adjustedBasis === null ? 'basis --' : `${formatCurrency(analysis.adjustedBasis)} basis`}</small>
+                <small>
+                  {analysis.adjustedBasis === null
+                    ? "basis --"
+                    : `${formatCurrency(analysis.adjustedBasis)} basis`}
+                </small>
               </span>
             </button>
             <button
@@ -472,28 +539,34 @@ function PositionList({ positions, activeId, onSelect, onDelete }) {
 
 function TradeForm({ onAdd }) {
   const [form, setForm] = useState(emptyEventForm);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const meta = TRADE_TYPES[form.type];
   const isOption = meta.option;
-  const isShareEvent = form.type === 'assignment' || form.type === 'called_away';
+  const isShareEvent =
+    form.type === "assignment" || form.type === "called_away";
 
   const update = (key, value) => {
     setForm((current) => {
       const next = { ...current, [key]: value };
-      if (key === 'contracts' && !isShareEvent) {
-        next.shares = String(Math.max(0, parseNumber(value) * CONTRACT_SIZE || CONTRACT_SIZE));
+      if (key === "contracts" && !isShareEvent) {
+        next.shares = String(
+          Math.max(0, parseNumber(value) * CONTRACT_SIZE || CONTRACT_SIZE)
+        );
       }
       return next;
     });
   };
 
   const updateType = (type) => {
-    setError('');
+    setError("");
     setForm((current) => ({
       ...current,
       type,
-      premium: TRADE_TYPES[type].option ? current.premium : '',
-      shares: type === 'assignment' || type === 'called_away' ? current.shares || '100' : current.shares,
+      premium: TRADE_TYPES[type].option ? current.premium : "",
+      shares:
+        type === "assignment" || type === "called_away"
+          ? current.shares || "100"
+          : current.shares,
     }));
   };
 
@@ -505,32 +578,32 @@ function TradeForm({ onAdd }) {
     const premium = parseNumber(form.premium);
 
     if (!form.date) {
-      setError('Date is required.');
+      setError("Date is required.");
       return;
     }
 
     if (strike <= 0) {
-      setError('Strike must be greater than zero.');
+      setError("Strike must be greater than zero.");
       return;
     }
 
     if (isOption && contracts <= 0) {
-      setError('Contracts must be greater than zero.');
+      setError("Contracts must be greater than zero.");
       return;
     }
 
     if (isOption && premium < 0) {
-      setError('Premium cannot be negative.');
+      setError("Premium cannot be negative.");
       return;
     }
 
     if (isShareEvent && shares <= 0) {
-      setError('Shares must be greater than zero.');
+      setError("Shares must be greater than zero.");
       return;
     }
 
     onAdd({
-      id: makeId('event'),
+      id: makeId("event"),
       type: form.type,
       date: form.date,
       contracts: isOption ? contracts : shares / CONTRACT_SIZE,
@@ -545,23 +618,27 @@ function TradeForm({ onAdd }) {
       ...emptyEventForm(),
       type: current.type,
       date: today(),
-      strike: '',
-      premium: '',
-      fees: current.fees || '0',
+      strike: "",
+      premium: "",
+      fees: current.fees || "0",
     }));
-    setError('');
+    setError("");
   };
 
   return (
     <form className="trade-form" onSubmit={submit}>
-      <div className="trade-type-grid" role="tablist" aria-label="Transaction type">
+      <div
+        className="trade-type-grid"
+        role="tablist"
+        aria-label="Transaction type"
+      >
         {TYPE_ORDER.map((type) => {
           const TypeIcon = TRADE_TYPES[type].icon;
           return (
             <button
               key={type}
               type="button"
-              className={form.type === type ? 'is-selected' : ''}
+              className={form.type === type ? "is-selected" : ""}
               onClick={() => updateType(type)}
             >
               <TypeIcon size={16} />
@@ -575,7 +652,11 @@ function TradeForm({ onAdd }) {
         <label className="date-field">
           <span>Date</span>
           <span className="date-control">
-            <input type="date" value={form.date} onChange={(event) => update('date', event.target.value)} />
+            <input
+              type="date"
+              value={form.date}
+              onChange={(event) => update("date", event.target.value)}
+            />
             <CalendarDays className="date-icon" size={18} aria-hidden="true" />
           </span>
         </label>
@@ -588,7 +669,7 @@ function TradeForm({ onAdd }) {
               min="0"
               step="1"
               value={form.contracts}
-              onChange={(event) => update('contracts', event.target.value)}
+              onChange={(event) => update("contracts", event.target.value)}
             />
           </label>
         ) : (
@@ -600,7 +681,7 @@ function TradeForm({ onAdd }) {
               min="0"
               step="1"
               value={form.shares}
-              onChange={(event) => update('shares', event.target.value)}
+              onChange={(event) => update("shares", event.target.value)}
             />
           </label>
         )}
@@ -612,7 +693,7 @@ function TradeForm({ onAdd }) {
             min="0"
             step="0.01"
             value={form.strike}
-            onChange={(event) => update('strike', event.target.value)}
+            onChange={(event) => update("strike", event.target.value)}
             placeholder="190"
           />
         </label>
@@ -625,7 +706,7 @@ function TradeForm({ onAdd }) {
               min="0"
               step="0.01"
               value={form.premium}
-              onChange={(event) => update('premium', event.target.value)}
+              onChange={(event) => update("premium", event.target.value)}
               placeholder="1.25"
             />
           </label>
@@ -638,7 +719,7 @@ function TradeForm({ onAdd }) {
             min="0"
             step="0.01"
             value={form.fees}
-            onChange={(event) => update('fees', event.target.value)}
+            onChange={(event) => update("fees", event.target.value)}
           />
         </label>
         <label className="wide">
@@ -646,7 +727,7 @@ function TradeForm({ onAdd }) {
           <input
             type="text"
             value={form.note}
-            onChange={(event) => update('note', event.target.value)}
+            onChange={(event) => update("note", event.target.value)}
             placeholder={meta.label}
           />
         </label>
@@ -687,17 +768,28 @@ function EventTimeline({ events, onDelete }) {
             <div className="timeline-copy">
               <div className="timeline-title">
                 <strong>{meta.label}</strong>
-                <span className={cashFlow >= 0 ? 'positive' : 'negative'}>{formatCurrency(cashFlow)}</span>
+                <span className={cashFlow >= 0 ? "positive" : "negative"}>
+                  {formatCurrency(cashFlow)}
+                </span>
               </div>
               <div className="timeline-meta">
                 <span>{event.date}</span>
                 <span>{formatNumber(event.shares)} shares</span>
                 <span>{formatCurrency(parseNumber(event.strike))} strike</span>
-                {meta.option ? <span>{formatCurrency(parseNumber(event.premium))} premium</span> : null}
+                {meta.option ? (
+                  <span>
+                    {formatCurrency(parseNumber(event.premium))} premium
+                  </span>
+                ) : null}
               </div>
               {event.note ? <p>{event.note}</p> : null}
             </div>
-            <button className="icon-button danger" type="button" aria-label="Delete transaction" onClick={() => onDelete(event.id)}>
+            <button
+              className="icon-button danger"
+              type="button"
+              aria-label="Delete transaction"
+              onClick={() => onDelete(event.id)}
+            >
               <Trash2 size={16} />
             </button>
           </li>
@@ -707,87 +799,148 @@ function EventTimeline({ events, onDelete }) {
   );
 }
 
-function PositionDetail({ position, onAddEvent, onDeleteEvent }) {
+function PositionDetail({
+  position,
+  onAddEvent,
+  onDeleteEvent,
+  section,
+  onSectionChange,
+}) {
   const analysis = useMemo(() => analyzePosition(position), [position]);
   const hasShares = analysis.currentShares > 0;
-  const basisLabel = hasShares ? formatCurrency(analysis.adjustedBasis) : '--';
+  const basisLabel = hasShares ? formatCurrency(analysis.adjustedBasis) : "--";
   const basisSubValue = hasShares
     ? `${formatCurrency(analysis.assignmentBasis)} after puts`
     : analysis.openPutContracts > 0
-      ? `${formatNumber(analysis.openPutContracts)} open put contracts`
-      : 'No assigned shares';
+    ? `${formatNumber(analysis.openPutContracts)} open put contracts`
+    : "No assigned shares";
 
   return (
     <section className="detail">
       <div className="detail-head">
         <div>
-          <p className="eyebrow">Active position</p>
           <h2>{position.symbol}</h2>
         </div>
-        <span className={`status-pill status-${analysis.status.toLowerCase().replace(' ', '-')}`}>{analysis.status}</span>
+        <span
+          className={`status-pill status-${analysis.status
+            .toLowerCase()
+            .replace(" ", "-")}`}
+        >
+          {analysis.status}
+        </span>
       </div>
 
-      <div className="hero-stat">
-        <span>Adjusted share cost</span>
-        <strong>{basisLabel}</strong>
-        <small>{basisSubValue}</small>
-      </div>
+      <nav className="detail-tabs" aria-label="Position sections">
+        {[
+          ["overview", "Overview"],
+          ["add", "Add trade"],
+          ["activity", "Activity"],
+        ].map(([id, label]) => (
+          <button
+            className={section === id ? "is-active" : ""}
+            key={id}
+            type="button"
+            onClick={() => onSectionChange(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
 
-      <div className="metrics-grid">
-        <Metric
-          icon={BadgeDollarSign}
-          label="Net premiums"
-          value={formatCurrency(analysis.netPremium)}
-          subValue={`${formatCurrency(analysis.putPremium)} puts | ${formatCurrency(analysis.callPremium)} calls`}
-          tone={analysis.netPremium >= 0 ? 'positive' : 'negative'}
-        />
-        <Metric
-          icon={WalletCards}
-          label="Current shares"
-          value={formatNumber(analysis.currentShares)}
-          subValue={analysis.averageAssignedStrike === null ? 'No assignment' : `${formatCurrency(analysis.averageAssignedStrike)} avg strike`}
-          tone="neutral"
-        />
-        <Metric
-          icon={ShieldCheck}
-          label="Open calls"
-          value={formatNumber(analysis.openCallContracts)}
-          subValue="contracts"
-          tone="neutral"
-        />
-        <Metric
-          icon={LineChart}
-          label={analysis.closedWheelPnl === null ? 'Net cash flow' : 'Closed wheel P/L'}
-          value={formatCurrency(analysis.closedWheelPnl === null ? analysis.totalCashFlow : analysis.closedWheelPnl)}
-          subValue={`${formatNumber(analysis.openPutContracts)} puts | ${formatNumber(analysis.openCallContracts)} calls open`}
-          tone={(analysis.closedWheelPnl === null ? analysis.totalCashFlow : analysis.closedWheelPnl) >= 0 ? 'positive' : 'negative'}
-        />
-      </div>
+      {section === "overview" ? (
+        <>
+          <div className="hero-stat">
+            <span>Adjusted share cost</span>
+            <strong>{basisLabel}</strong>
+            <small>{basisSubValue}</small>
+          </div>
+          <div className="metrics-grid">
+            <Metric
+              icon={BadgeDollarSign}
+              label="Net premiums"
+              value={formatCurrency(analysis.netPremium)}
+              subValue={`${formatCurrency(
+                analysis.putPremium
+              )} puts | ${formatCurrency(analysis.callPremium)} calls`}
+              tone={analysis.netPremium >= 0 ? "positive" : "negative"}
+            />
+            <Metric
+              icon={WalletCards}
+              label="Current shares"
+              value={formatNumber(analysis.currentShares)}
+              subValue={
+                analysis.averageAssignedStrike === null
+                  ? "No assignment"
+                  : `${formatCurrency(
+                      analysis.averageAssignedStrike
+                    )} avg strike`
+              }
+              tone="neutral"
+            />
+            <Metric
+              icon={ShieldCheck}
+              label="Open calls"
+              value={formatNumber(analysis.openCallContracts)}
+              subValue="contracts"
+              tone="neutral"
+            />
+            <Metric
+              icon={LineChart}
+              label={
+                analysis.closedWheelPnl === null
+                  ? "Net cash flow"
+                  : "Closed wheel P/L"
+              }
+              value={formatCurrency(
+                analysis.closedWheelPnl === null
+                  ? analysis.totalCashFlow
+                  : analysis.closedWheelPnl
+              )}
+              subValue={`${formatNumber(
+                analysis.openPutContracts
+              )} puts | ${formatNumber(analysis.openCallContracts)} calls open`}
+              tone={
+                (analysis.closedWheelPnl === null
+                  ? analysis.totalCashFlow
+                  : analysis.closedWheelPnl) >= 0
+                  ? "positive"
+                  : "negative"
+              }
+            />
+          </div>
+        </>
+      ) : null}
 
-      <section className="subsection">
-        <div className="section-title">
-          <Plus size={18} />
-          <h3>Add transaction</h3>
-        </div>
-        <TradeForm onAdd={onAddEvent} />
-      </section>
+      {section === "add" ? (
+        <section className="subsection">
+          <div className="section-title">
+            <Plus size={18} />
+            <h3>Add transaction</h3>
+          </div>
+          <TradeForm onAdd={onAddEvent} />
+        </section>
+      ) : null}
 
-      <section className="subsection">
-        <div className="section-title">
-          <CalendarDays size={18} />
-          <h3>Timeline</h3>
-        </div>
-        <EventTimeline events={analysis.events} onDelete={onDeleteEvent} />
-      </section>
+      {section === "activity" ? (
+        <section className="subsection">
+          <div className="section-title">
+            <CalendarDays size={18} />
+            <h3>Timeline</h3>
+          </div>
+          <EventTimeline events={analysis.events} onDelete={onDeleteEvent} />
+        </section>
+      ) : null}
     </section>
   );
 }
 
 function DataActions({ positions, onImport, onReset }) {
   const exportData = () => {
-    const blob = new Blob([JSON.stringify({ positions }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ positions }, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
+    const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = `PeteWheeler-${today()}.json`;
     anchor.click();
@@ -801,12 +954,13 @@ function DataActions({ positions, onImport, onReset }) {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      if (!Array.isArray(parsed.positions)) throw new Error('Missing positions array');
+      if (!Array.isArray(parsed.positions))
+        throw new Error("Missing positions array");
       onImport(parsed.positions);
     } catch {
-      window.alert('That file could not be imported.');
+      window.alert("That file could not be imported.");
     } finally {
-      event.target.value = '';
+      event.target.value = "";
     }
   };
 
@@ -821,7 +975,11 @@ function DataActions({ positions, onImport, onReset }) {
         Import
         <input type="file" accept="application/json" onChange={importData} />
       </label>
-      <button className="secondary-button danger-text" type="button" onClick={onReset}>
+      <button
+        className="secondary-button danger-text"
+        type="button"
+        onClick={onReset}
+      >
         <RotateCcw size={17} />
         Reset
       </button>
@@ -831,16 +989,25 @@ function DataActions({ positions, onImport, onReset }) {
 
 export default function App() {
   const [positions, setPositions] = useLocalStorage(STORAGE_KEY, []);
-  const [activeId, setActiveId] = useState('');
+  const [activeId, setActiveId] = useState("");
+  const [screen, setScreen] = useState("home");
+  const [detailSection, setDetailSection] = useState("overview");
   const portfolio = useMemo(() => summarizePortfolio(positions), [positions]);
-  const activePosition = positions.find((position) => position.id === activeId) || positions[0] || null;
+  const activePosition =
+    positions.find((position) => position.id === activeId) ||
+    positions[0] ||
+    null;
 
   useEffect(() => {
     if (!activeId && positions.length) {
       setActiveId(positions[0].id);
     }
 
-    if (activeId && positions.length && !positions.some((position) => position.id === activeId)) {
+    if (
+      activeId &&
+      positions.length &&
+      !positions.some((position) => position.id === activeId)
+    ) {
       setActiveId(positions[0].id);
     }
   }, [activeId, positions]);
@@ -848,6 +1015,8 @@ export default function App() {
   const createPosition = (position) => {
     setPositions((current) => [position, ...current]);
     setActiveId(position.id);
+    setScreen("positions");
+    setDetailSection("overview");
   };
 
   const deletePosition = (positionId) => {
@@ -861,8 +1030,10 @@ export default function App() {
     if (!activePosition) return;
     setPositions((current) =>
       current.map((position) =>
-        position.id === activePosition.id ? { ...position, events: [tradeEvent, ...(position.events || [])] } : position,
-      ),
+        position.id === activePosition.id
+          ? { ...position, events: [tradeEvent, ...(position.events || [])] }
+          : position
+      )
     );
   };
 
@@ -871,32 +1042,38 @@ export default function App() {
     setPositions((current) =>
       current.map((position) =>
         position.id === activePosition.id
-          ? { ...position, events: (position.events || []).filter((event) => event.id !== eventId) }
-          : position,
-      ),
+          ? {
+              ...position,
+              events: (position.events || []).filter(
+                (event) => event.id !== eventId
+              ),
+            }
+          : position
+      )
     );
   };
 
   const loadSample = () => {
     setPositions([SAMPLE_POSITION]);
     setActiveId(SAMPLE_POSITION.id);
+    setScreen("positions");
   };
 
   const resetAll = () => {
-    if (!window.confirm('Reset all saved positions?')) return;
+    if (!window.confirm("Reset all saved positions?")) return;
     setPositions([]);
-    setActiveId('');
+    setActiveId("");
   };
 
   const importPositions = (importedPositions) => {
     const normalized = importedPositions.map((position) => ({
-      id: position.id || makeId('position'),
-      symbol: String(position.symbol || '').toUpperCase(),
+      id: position.id || makeId("position"),
+      symbol: String(position.symbol || "").toUpperCase(),
       createdAt: position.createdAt || new Date().toISOString(),
       events: Array.isArray(position.events) ? position.events : [],
     }));
     setPositions(normalized.filter((position) => position.symbol));
-    setActiveId(normalized[0]?.id || '');
+    setActiveId(normalized[0]?.id || "");
   };
 
   return (
@@ -908,61 +1085,191 @@ export default function App() {
           </div>
           <div>
             <p>PeteWheeler</p>
-            <h1>Options cost tracker</h1>
+            <h1>
+              {screen === "home"
+                ? "Portfolio"
+                : screen === "positions"
+                ? "Positions"
+                : screen === "activity"
+                ? "Activity"
+                : "Settings"}
+            </h1>
           </div>
         </div>
-        <DataActions positions={positions} onImport={importPositions} onReset={resetAll} />
+        {screen === "settings" ? (
+          <DataActions
+            positions={positions}
+            onImport={importPositions}
+            onReset={resetAll}
+          />
+        ) : (
+          <button
+            className="header-action"
+            type="button"
+            onClick={() => setScreen("settings")}
+            aria-label="Open settings"
+          >
+            <MoreHorizontal size={22} />
+          </button>
+        )}
       </header>
 
-      <section className="portfolio-strip" aria-label="Portfolio summary">
-        <Metric
-          icon={BadgeDollarSign}
-          label="Premium bank"
-          value={formatCurrency(portfolio.netPremium, true)}
-          subValue={`${positions.length} tracked`}
-          tone={portfolio.netPremium >= 0 ? 'positive' : 'negative'}
-        />
-        <Metric
-          icon={WalletCards}
-          label="Assigned shares"
-          value={formatNumber(portfolio.currentShares)}
-          subValue={`${portfolio.assignedPositions} active`}
-          tone="neutral"
-        />
-        <Metric
-          icon={ShieldCheck}
-          label="Open puts"
-          value={formatNumber(portfolio.openPutContracts)}
-          subValue="contracts"
-          tone="neutral"
-        />
-      </section>
-
-      {positions.length ? (
-        <main className="main-grid">
-          <aside className="position-column">
+      {screen === "home" ? (
+        <main className="screen-content">
+          <section className="portfolio-strip" aria-label="Portfolio summary">
+            <Metric
+              icon={BadgeDollarSign}
+              label="Premium bank"
+              value={formatCurrency(portfolio.netPremium, true)}
+              subValue={`${positions.length} tracked`}
+              tone={portfolio.netPremium >= 0 ? "positive" : "negative"}
+            />
+            <Metric
+              icon={WalletCards}
+              label="Assigned shares"
+              value={formatNumber(portfolio.currentShares)}
+              subValue={`${portfolio.assignedPositions} active`}
+              tone="neutral"
+            />
+            <Metric
+              icon={ShieldCheck}
+              label="Open puts"
+              value={formatNumber(portfolio.openPutContracts)}
+              subValue="contracts"
+              tone="neutral"
+            />
+          </section>
+          <section className="home-section">
+            <div className="section-title">
+              <ChartNoAxesCombined size={18} />
+              <h2>At a glance</h2>
+            </div>
+            <div className="summary-card">
+              <span>Tracked positions</span>
+              <strong>{positions.length}</strong>
+              <small>
+                {portfolio.assignedPositions} holding shares ·{" "}
+                {portfolio.openPutContracts} puts open
+              </small>
+            </div>
+          </section>
+          <section className="home-section">
             <div className="section-title">
               <WalletCards size={18} />
               <h2>Positions</h2>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setScreen("positions")}
+              >
+                See all
+              </button>
+            </div>
+            {positions.length ? (
+              <PositionList
+                positions={positions.slice(0, 4)}
+                activeId={activePosition?.id}
+                onSelect={(id) => {
+                  setActiveId(id);
+                  setScreen("positions");
+                }}
+                onDelete={deletePosition}
+              />
+            ) : (
+              <EmptyState onLoadSample={loadSample} />
+            )}
+          </section>
+        </main>
+      ) : null}
+
+      {screen === "positions" ? (
+        <main className="screen-content positions-screen">
+          <section className="position-column">
+            <div className="section-title">
+              <WalletCards size={18} />
+              <h2>Your positions</h2>
             </div>
             <PositionCreator onCreate={createPosition} />
-            <PositionList positions={positions} activeId={activePosition?.id} onSelect={setActiveId} onDelete={deletePosition} />
-          </aside>
-
+            {positions.length ? (
+              <PositionList
+                positions={positions}
+                activeId={activePosition?.id}
+                onSelect={(id) => {
+                  setActiveId(id);
+                  setDetailSection("overview");
+                }}
+                onDelete={deletePosition}
+              />
+            ) : (
+              <EmptyState onLoadSample={loadSample} />
+            )}
+          </section>
           {activePosition ? (
             <PositionDetail
               position={activePosition}
+              section={detailSection}
+              onSectionChange={setDetailSection}
               onAddEvent={addEvent}
               onDeleteEvent={deleteEvent}
             />
           ) : null}
         </main>
-      ) : (
-        <main className="empty-layout">
-          <PositionCreator onCreate={createPosition} />
-          <EmptyState onLoadSample={loadSample} />
+      ) : null}
+
+      {screen === "activity" ? (
+        <main className="screen-content">
+          {activePosition ? (
+            <PositionDetail
+              position={activePosition}
+              section="activity"
+              onSectionChange={setDetailSection}
+              onAddEvent={addEvent}
+              onDeleteEvent={deleteEvent}
+            />
+          ) : (
+            <EmptyState onLoadSample={loadSample} />
+          )}
         </main>
-      )}
+      ) : null}
+
+      {screen === "settings" ? (
+        <main className="screen-content settings-screen">
+          <section className="detail">
+            <div className="section-title">
+              <MoreHorizontal size={18} />
+              <h2>Data management</h2>
+            </div>
+            <p className="settings-copy">
+              Your positions are saved privately on this device. Export a backup
+              anytime, or import a previous one.
+            </p>
+            <DataActions
+              positions={positions}
+              onImport={importPositions}
+              onReset={resetAll}
+            />
+          </section>
+        </main>
+      ) : null}
+
+      <nav className="tab-bar" aria-label="Main navigation">
+        {[
+          ["home", House, "Home"],
+          ["positions", WalletCards, "Positions"],
+          ["activity", List, "Activity"],
+          ["settings", MoreHorizontal, "More"],
+        ].map(([id, Icon, label]) => (
+          <button
+            key={id}
+            className={screen === id ? "is-active" : ""}
+            type="button"
+            onClick={() => setScreen(id)}
+          >
+            <Icon size={20} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
