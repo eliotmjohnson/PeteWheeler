@@ -6,6 +6,8 @@ import {
   CalendarDays,
   ChartNoAxesCombined,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Download,
   LineChart,
   ListPlus,
@@ -17,6 +19,7 @@ import {
   Trash2,
   Upload,
   WalletCards,
+  X,
   House,
 } from "lucide-react";
 
@@ -486,24 +489,18 @@ function PositionCreator({ onCreate }) {
         aria-label="Create position"
       >
         <Plus size={18} />
-        Add
       </button>
     </form>
   );
 }
 
-function PositionList({ positions, activeId, onSelect, onDelete }) {
+function PositionList({ positions, onSelect }) {
   return (
     <div className="position-list">
       {positions.map((position) => {
         const analysis = analyzePosition(position);
-        const isActive = position.id === activeId;
-
         return (
-          <article
-            className={`position-row ${isActive ? "is-active" : ""}`}
-            key={position.id}
-          >
+          <article className="position-row" key={position.id}>
             <button
               className="position-select"
               type="button"
@@ -511,28 +508,82 @@ function PositionList({ positions, activeId, onSelect, onDelete }) {
             >
               <span className="position-main">
                 <strong>{position.symbol}</strong>
-                <small>{analysis.status}</small>
+                <small>{analysis.status} · {analysis.events.length} transactions</small>
               </span>
               <span className="position-side">
-                <span>{formatNumber(analysis.events.length)} transactions</span>
                 <small>
                   {analysis.adjustedBasis === null
-                    ? "basis --"
+                    ? "No share basis"
                     : `${formatCurrency(analysis.adjustedBasis)} basis`}
                 </small>
               </span>
-            </button>
-            <button
-              className="icon-button danger ghost"
-              type="button"
-              aria-label={`Delete ${position.symbol}`}
-              onClick={() => onDelete(position.id)}
-            >
-              <Trash2 size={16} />
+              <ChevronRight className="row-chevron" size={24} strokeWidth={2.25} aria-hidden="true" />
             </button>
           </article>
         );
       })}
+    </div>
+  );
+}
+
+function Modal({ title, children, onClose }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setIsOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    const bodyStyle = document.body.style;
+    const original = {
+      overflow: bodyStyle.overflow,
+      position: bodyStyle.position,
+      top: bodyStyle.top,
+      width: bodyStyle.width,
+    };
+
+    bodyStyle.overflow = "hidden";
+    bodyStyle.position = "fixed";
+    bodyStyle.top = `-${scrollY}px`;
+    bodyStyle.width = "100%";
+
+    return () => {
+      bodyStyle.overflow = original.overflow;
+      bodyStyle.position = original.position;
+      bodyStyle.top = original.top;
+      bodyStyle.width = original.width;
+      window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
+    };
+  }, []);
+
+  const requestClose = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    window.setTimeout(onClose, 220);
+  };
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={requestClose}>
+      <section
+        className={`modal-sheet ${isOpen && !isClosing ? "is-open" : ""} ${
+          isClosing ? "is-closing" : ""
+        }`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="modal-head">
+          <h2 id="modal-title">{title}</h2>
+          <button className="icon-button" type="button" onClick={requestClose} aria-label="Close">
+            <X size={19} />
+          </button>
+        </div>
+        {children}
+      </section>
     </div>
   );
 }
@@ -657,7 +708,6 @@ function TradeForm({ onAdd }) {
               value={form.date}
               onChange={(event) => update("date", event.target.value)}
             />
-            <CalendarDays className="date-icon" size={18} aria-hidden="true" />
           </span>
         </label>
         {isOption ? (
@@ -799,12 +849,92 @@ function EventTimeline({ events, onDelete }) {
   );
 }
 
+function ActivityList({ positions, onDeleteEvent }) {
+  const events = positions
+    .flatMap((position) =>
+      (position.events || []).map((event) => ({ ...event, symbol: position.symbol, positionId: position.id }))
+    )
+    .sort((a, b) => eventSortValue(b, 0).localeCompare(eventSortValue(a, 0)));
+
+  if (!events.length) {
+    return <div className="quiet-state"><CalendarDays size={22} /><span>No transactions yet</span></div>;
+  }
+
+  return (
+    <ol className="timeline activity-list">
+      {events.map((event) => {
+        const meta = TRADE_TYPES[event.type];
+        const cashFlow = eventCashFlow(event);
+        return (
+          <li className={`timeline-item ${meta.side}`} key={event.id}>
+            <div className="timeline-copy">
+              <div className="timeline-title">
+                <strong>{event.symbol} · {meta.label}</strong>
+                <span className={cashFlow >= 0 ? "positive" : "negative"}>{formatCurrency(cashFlow)}</span>
+              </div>
+              <div className="timeline-meta">
+                <span>{event.date}</span>
+                <span>{formatCurrency(parseNumber(event.strike))} strike</span>
+                {meta.option ? <span>{formatCurrency(parseNumber(event.premium))} premium</span> : <span>{formatNumber(event.shares)} shares</span>}
+              </div>
+            </div>
+            <button className="icon-button danger" type="button" aria-label="Delete transaction" onClick={() => onDeleteEvent(event.positionId, event.id)}>
+              <Trash2 size={16} />
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function RecentActivity({ positions, onSeeMore }) {
+  const events = positions
+    .flatMap((position) =>
+      (position.events || []).map((event) => ({ ...event, symbol: position.symbol }))
+    )
+    .sort((a, b) => eventSortValue(b, 0).localeCompare(eventSortValue(a, 0)))
+    .slice(0, 3);
+
+  if (!events.length) return null;
+
+  return (
+    <section className="home-section recent-activity">
+      <div className="section-title">
+        <CalendarDays size={18} />
+        <h2>Recent activity</h2>
+      </div>
+      <ol className="recent-list">
+        {events.map((event) => {
+          const meta = TRADE_TYPES[event.type];
+          const cashFlow = eventCashFlow(event);
+          return (
+            <li key={event.id}>
+              <span>
+                <strong>{event.symbol}</strong>
+                <small>{meta.shortLabel} · {event.date}</small>
+              </span>
+              <strong className={cashFlow >= 0 ? "positive" : "negative"}>
+                {formatCurrency(cashFlow)}
+              </strong>
+            </li>
+          );
+        })}
+      </ol>
+      <button className="recent-more" type="button" onClick={onSeeMore}>
+        See more
+        <ChevronRight size={17} />
+      </button>
+    </section>
+  );
+}
+
 function PositionDetail({
   position,
   onAddEvent,
   onDeleteEvent,
-  section,
-  onSectionChange,
+  onBack,
+  onDeletePosition,
 }) {
   const analysis = useMemo(() => analyzePosition(position), [position]);
   const hasShares = analysis.currentShares > 0;
@@ -818,7 +948,8 @@ function PositionDetail({
   return (
     <section className="detail">
       <div className="detail-head">
-        <div>
+        <div className="detail-title">
+          <button className="back-button" type="button" onClick={onBack} aria-label="Back to positions"><ChevronLeft size={20} /></button>
           <h2>{position.symbol}</h2>
         </div>
         <span
@@ -830,25 +961,7 @@ function PositionDetail({
         </span>
       </div>
 
-      <nav className="detail-tabs" aria-label="Position sections">
-        {[
-          ["overview", "Overview"],
-          ["add", "Add trade"],
-          ["activity", "Activity"],
-        ].map(([id, label]) => (
-          <button
-            className={section === id ? "is-active" : ""}
-            key={id}
-            type="button"
-            onClick={() => onSectionChange(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {section === "overview" ? (
-        <>
+      <>
           <div className="hero-stat">
             <span>Adjusted share cost</span>
             <strong>{basisLabel}</strong>
@@ -908,28 +1021,12 @@ function PositionDetail({
               }
             />
           </div>
-        </>
-      ) : null}
-
-      {section === "add" ? (
-        <section className="subsection">
-          <div className="section-title">
-            <Plus size={18} />
-            <h3>Add transaction</h3>
-          </div>
-          <TradeForm onAdd={onAddEvent} />
+        <section className="subsection detail-history">
+          <div className="section-title"><CalendarDays size={18} /><h3>Transaction history</h3></div>
+          <EventTimeline events={[...analysis.events].reverse()} onDelete={onDeleteEvent} />
         </section>
-      ) : null}
-
-      {section === "activity" ? (
-        <section className="subsection">
-          <div className="section-title">
-            <CalendarDays size={18} />
-            <h3>Timeline</h3>
-          </div>
-          <EventTimeline events={analysis.events} onDelete={onDeleteEvent} />
-        </section>
-      ) : null}
+        <button className="delete-position" type="button" onClick={onDeletePosition}>Delete position</button>
+      </>
     </section>
   );
 }
@@ -991,7 +1088,7 @@ export default function App() {
   const [positions, setPositions] = useLocalStorage(STORAGE_KEY, []);
   const [activeId, setActiveId] = useState("");
   const [screen, setScreen] = useState("home");
-  const [detailSection, setDetailSection] = useState("overview");
+  const [modal, setModal] = useState(null);
   const portfolio = useMemo(() => summarizePortfolio(positions), [positions]);
   const activePosition =
     positions.find((position) => position.id === activeId) ||
@@ -1012,18 +1109,23 @@ export default function App() {
     }
   }, [activeId, positions]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [screen]);
+
   const createPosition = (position) => {
     setPositions((current) => [position, ...current]);
     setActiveId(position.id);
     setScreen("positions");
-    setDetailSection("overview");
+    setModal(null);
   };
 
   const deletePosition = (positionId) => {
     const position = positions.find((item) => item.id === positionId);
-    if (!position) return;
-    if (!window.confirm(`Delete ${position.symbol}?`)) return;
+    if (!position) return false;
+    if (!window.confirm(`Delete ${position.symbol}?`)) return false;
     setPositions((current) => current.filter((item) => item.id !== positionId));
+    return true;
   };
 
   const addEvent = (tradeEvent) => {
@@ -1035,13 +1137,13 @@ export default function App() {
           : position
       )
     );
+    setModal(null);
   };
 
-  const deleteEvent = (eventId) => {
-    if (!activePosition) return;
+  const deleteEvent = (positionId, eventId) => {
     setPositions((current) =>
       current.map((position) =>
-        position.id === activePosition.id
+        position.id === positionId
           ? {
               ...position,
               events: (position.events || []).filter(
@@ -1090,19 +1192,15 @@ export default function App() {
                 ? "Portfolio"
                 : screen === "positions"
                 ? "Positions"
+                : screen === "detail"
+                ? "Position"
                 : screen === "activity"
                 ? "Activity"
-                : "Settings"}
+                : "More"}
             </h1>
           </div>
         </div>
-        {screen === "settings" ? (
-          <DataActions
-            positions={positions}
-            onImport={importPositions}
-            onReset={resetAll}
-          />
-        ) : (
+        {screen !== "settings" && screen !== "detail" ? (
           <button
             className="header-action"
             type="button"
@@ -1111,7 +1209,7 @@ export default function App() {
           >
             <MoreHorizontal size={22} />
           </button>
-        )}
+        ) : null}
       </header>
 
       {screen === "home" ? (
@@ -1153,83 +1251,64 @@ export default function App() {
               </small>
             </div>
           </section>
-          <section className="home-section">
-            <div className="section-title">
-              <WalletCards size={18} />
-              <h2>Positions</h2>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => setScreen("positions")}
-              >
-                See all
-              </button>
-            </div>
-            {positions.length ? (
-              <PositionList
-                positions={positions.slice(0, 4)}
-                activeId={activePosition?.id}
-                onSelect={(id) => {
-                  setActiveId(id);
-                  setScreen("positions");
-                }}
-                onDelete={deletePosition}
-              />
-            ) : (
-              <EmptyState onLoadSample={loadSample} />
-            )}
-          </section>
+          <RecentActivity positions={positions} onSeeMore={() => setScreen("activity")} />
         </main>
       ) : null}
 
       {screen === "positions" ? (
         <main className="screen-content positions-screen">
-          <section className="position-column">
+          <section className="position-column simple-list-screen">
             <div className="section-title">
               <WalletCards size={18} />
               <h2>Your positions</h2>
             </div>
-            <PositionCreator onCreate={createPosition} />
             {positions.length ? (
               <PositionList
                 positions={positions}
-                activeId={activePosition?.id}
                 onSelect={(id) => {
                   setActiveId(id);
-                  setDetailSection("overview");
+                  setScreen("detail");
                 }}
-                onDelete={deletePosition}
               />
             ) : (
               <EmptyState onLoadSample={loadSample} />
             )}
           </section>
-          {activePosition ? (
-            <PositionDetail
-              position={activePosition}
-              section={detailSection}
-              onSectionChange={setDetailSection}
-              onAddEvent={addEvent}
-              onDeleteEvent={deleteEvent}
-            />
-          ) : null}
+        </main>
+      ) : null}
+
+      {screen === "detail" && activePosition ? (
+        <main className="screen-content detail-screen">
+          <PositionDetail
+            position={activePosition}
+            onBack={() => setScreen("positions")}
+            onDeletePosition={() => {
+              if (deletePosition(activePosition.id)) setScreen("positions");
+            }}
+            onAddEvent={addEvent}
+            onDeleteEvent={(eventId) => deleteEvent(activePosition.id, eventId)}
+          />
         </main>
       ) : null}
 
       {screen === "activity" ? (
         <main className="screen-content">
-          {activePosition ? (
-            <PositionDetail
-              position={activePosition}
-              section="activity"
-              onSectionChange={setDetailSection}
-              onAddEvent={addEvent}
-              onDeleteEvent={deleteEvent}
-            />
-          ) : (
-            <EmptyState onLoadSample={loadSample} />
-          )}
+          <ActivityList positions={positions} onDeleteEvent={deleteEvent} />
         </main>
+      ) : null}
+
+      {screen === "positions" ? (
+        <button className="fab" type="button" onClick={() => setModal("position")} aria-label="Add position"><Plus size={25} /></button>
+      ) : null}
+      {screen === "detail" && activePosition ? (
+        <button className="fab" type="button" onClick={() => setModal("transaction")} aria-label="Add transaction"><Plus size={25} /></button>
+      ) : null}
+
+      {modal === "position" ? (
+        <Modal title="Add position" onClose={() => setModal(null)}><PositionCreator onCreate={createPosition} /></Modal>
+      ) : null}
+      {modal === "transaction" ? (
+        <Modal title={`Add transaction · ${activePosition?.symbol || ""}`} onClose={() => setModal(null)}><TradeForm onAdd={addEvent} /></Modal>
       ) : null}
 
       {screen === "settings" ? (
