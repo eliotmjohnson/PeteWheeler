@@ -1,4 +1,4 @@
-const CACHE_NAME = 'petewheeler-v7';
+const CACHE_NAME = 'petewheeler-v8';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/petewheeler-icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -17,6 +17,24 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+
+  const isAppShellRequest =
+    event.request.mode === 'navigate' || new URL(event.request.url).pathname.endsWith('/index.html');
+
+  if (isAppShellRequest) {
+    event.respondWith(
+      fetch(event.request)
+        .then(async (response) => {
+          if (response.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((response) => response || caches.match('./index.html'))),
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(async (cachedResponse) => {
