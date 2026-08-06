@@ -838,15 +838,8 @@ input::placeholder {
 .data-actions .secondary-button {
   width: 100%;
 }
-.file-button {
-  position: relative;
-  overflow: hidden;
-}
-.file-button input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
+.file-input {
+  display: none;
 }
 .tab-bar {
   position: fixed;

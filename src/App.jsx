@@ -1245,6 +1245,7 @@ function PositionDetail({
 function DataActions({ positions, onImport, onReset }) {
   const [notice, setNotice] = useState(null);
   const noticeTimer = useRef(null);
+  const importInputRef = useRef(null);
 
   useEffect(
     () => () => {
@@ -1329,11 +1330,21 @@ function DataActions({ positions, onImport, onReset }) {
         <Download size={17} />
         Export
       </button>
-      <label className="secondary-button file-button">
+      <button
+        className="secondary-button"
+        type="button"
+        onClick={() => importInputRef.current?.click()}
+      >
         <Upload size={17} />
         Import
-        <input type="file" accept="application/json" onChange={importData} />
-      </label>
+      </button>
+      <input
+        ref={importInputRef}
+        className="file-input"
+        type="file"
+        accept="application/json"
+        onChange={importData}
+      />
       <button
         className="secondary-button danger-text"
         type="button"
