@@ -63,7 +63,7 @@ input:focus-visible {
 }
 .app-shell {
   width: min(760px, 100%);
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
   padding: max(18px, env(safe-area-inset-top)) 16px
     calc(98px + env(safe-area-inset-bottom));
@@ -118,7 +118,7 @@ input:focus-visible {
   display: grid;
   gap: 22px;
   transform-origin: 50% 0;
-  animation: screen-in 0.42s cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation: screen-in 0.62s cubic-bezier(0.22, 0.8, 0.2, 1) both;
 }
 @keyframes screen-in {
   from {
@@ -133,22 +133,33 @@ input:focus-visible {
   }
 }
 .detail-screen {
-  animation: detail-screen-in 0.42s cubic-bezier(0.22, 0.8, 0.2, 1) both;
+  animation: detail-screen-in 0.62s cubic-bezier(0.22, 0.8, 0.2, 1) both;
+}
+.detail-screen .detail {
+  animation: detail-card-in 0.72s cubic-bezier(0.18, 0.8, 0.24, 1) both;
+  margin-bottom: 68px;
 }
 @keyframes detail-screen-in {
   from {
     opacity: 0;
-    transform: translateY(32px) scale(0.985);
     filter: blur(4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
     filter: blur(0);
   }
 }
+@keyframes detail-card-in {
+  from {
+    transform: translateY(72px) scale(0.975);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .screen-content {
+  .screen-content,
+  .detail-screen .detail {
     animation-duration: 0.01ms;
   }
 }
@@ -164,8 +175,10 @@ input:focus-visible {
   display: inline-block;
   min-width: 1ch;
   overflow: visible;
-  padding-left: 1px;
-  letter-spacing: -0.025em;
+  padding-inline: 1px;
+  margin-left: -2px;
+  letter-spacing: 0;
+  -webkit-text-stroke: 0.1px currentColor;
 }
 .metric {
   min-width: 0;
@@ -353,6 +366,42 @@ label > span {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 15px;
+}
+.position-groups,
+.position-group {
+  display: grid;
+}
+.position-groups {
+  gap: 24px;
+  margin-top: 14px;
+}
+.position-group {
+  gap: 8px;
+}
+.position-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 2px;
+}
+.position-group-head h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.position-group-head span {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 0.74rem;
+  font-weight: 800;
 }
 .position-row {
   display: grid;
@@ -629,6 +678,11 @@ input::placeholder {
   padding: 12px;
   border-bottom: 1px solid var(--line);
 }
+.timeline-actions {
+  display: flex;
+  align-items: start;
+  gap: 2px;
+}
 .timeline-item:last-child {
   border-bottom: 0;
 }
@@ -697,6 +751,20 @@ input::placeholder {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+.data-notice {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  color: #248a3d;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.data-notice.error {
+  background: var(--red-soft);
+  color: #c92d24;
 }
 .data-actions .secondary-button {
   width: 100%;
@@ -774,7 +842,7 @@ input::placeholder {
   .timeline-item {
     grid-template-columns: auto 1fr;
   }
-  .timeline-item > .icon-button {
+  .timeline-item > .timeline-actions {
     grid-column: 2;
     justify-self: end;
   }
@@ -895,6 +963,20 @@ input::placeholder {
   align-items: center;
   grid-template-columns: 1fr auto;
 }
+.activity-amount {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  text-align: right;
+}
+.activity-amount strong {
+  font-size: 0.9rem;
+}
+.activity-amount small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
 .delete-position {
   margin-top: 18px;
   border: 0;
@@ -925,6 +1007,8 @@ input::placeholder {
   display: grid;
   align-items: end;
   background: transparent;
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 .modal-sheet {
   width: min(760px, 100%);
@@ -936,6 +1020,7 @@ input::placeholder {
   transform: translateY(100%);
   transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
   overscroll-behavior: none;
+  touch-action: pan-y;
   background: var(--paper);
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.16);
 }

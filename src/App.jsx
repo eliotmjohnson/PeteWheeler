@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -13,6 +13,7 @@ import {
   ListPlus,
   List,
   MoreHorizontal,
+  Pencil,
   Plus,
   RotateCcw,
   ShieldCheck,
@@ -79,6 +80,15 @@ const TYPE_ORDER = [
   "buy_call",
   "called_away",
 ];
+
+const SAME_DAY_EVENT_ORDER = {
+  buy_put: 0,
+  buy_call: 0,
+  sell_put: 1,
+  sell_call: 1,
+  assignment: 2,
+  called_away: 3,
+};
 
 const SAMPLE_POSITION = {
   id: "sample-aapl",
@@ -156,6 +166,17 @@ const emptyEventForm = () => ({
   note: "",
 });
 
+const eventFormValues = (tradeEvent) => ({
+  type: tradeEvent.type,
+  date: tradeEvent.date,
+  contracts: String(tradeEvent.contracts),
+  shares: String(tradeEvent.shares),
+  strike: String(tradeEvent.strike),
+  premium: String(tradeEvent.premium),
+  fees: String(tradeEvent.fees),
+  note: tradeEvent.note || "",
+});
+
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -183,6 +204,10 @@ function formatCurrency(value, compact = false) {
 function formatNumber(value) {
   if (!Number.isFinite(value)) return "--";
   return numberFormatter.format(value);
+}
+
+function pluralize(count, singular, plural = `${singular}s`) {
+  return Math.abs(parseNumber(count)) === 1 ? singular : plural;
 }
 
 function parseNumber(value) {
@@ -245,10 +270,10 @@ function eventSortValue(event, index) {
   const dateValue = new Date(
     `${event.date || "1970-01-01"}T00:00:00`
   ).getTime();
-  return `${String(dateValue).padStart(16, "0")}-${String(index).padStart(
-    8,
-    "0"
-  )}`;
+  const sameDayOrder = SAME_DAY_EVENT_ORDER[event.type] ?? 4;
+  return `${String(dateValue).padStart(16, "0")}-${sameDayOrder}-${String(
+    index
+  ).padStart(8, "0")}`;
 }
 
 function analyzePosition(position) {
@@ -375,21 +400,17 @@ function summarizePortfolio(positions) {
   return positions.reduce(
     (acc, position) => {
       const analysis = analyzePosition(position);
-      acc.netPremium += analysis.netPremium;
+      acc.wheelPnl += analysis.closedWheelPnl ?? analysis.netPremium;
       acc.currentShares += analysis.currentShares;
-      acc.assignmentCost += analysis.assignmentCost;
       acc.assignedPositions += analysis.currentShares > 0 ? 1 : 0;
       acc.openPutContracts += analysis.openPutContracts;
-      acc.closedWheelPnl += analysis.closedWheelPnl || 0;
       return acc;
     },
     {
-      netPremium: 0,
+      wheelPnl: 0,
       currentShares: 0,
-      assignmentCost: 0,
       assignedPositions: 0,
       openPutContracts: 0,
-      closedWheelPnl: 0,
     }
   );
 }
@@ -494,34 +515,74 @@ function PositionCreator({ onCreate }) {
   );
 }
 
-function PositionList({ positions, onSelect }) {
+function PositionRows({ items, onSelect }) {
   return (
     <div className="position-list">
-      {positions.map((position) => {
-        const analysis = analyzePosition(position);
-        return (
-          <article className="position-row" key={position.id}>
-            <button
-              className="position-select"
-              type="button"
-              onClick={() => onSelect(position.id)}
-            >
-              <span className="position-main">
-                <strong>{position.symbol}</strong>
-                <small>{analysis.status} · {analysis.events.length} transactions</small>
-              </span>
-              <span className="position-side">
-                <small>
-                  {analysis.adjustedBasis === null
-                    ? "No share basis"
-                    : `${formatCurrency(analysis.adjustedBasis)} basis`}
-                </small>
-              </span>
-              <ChevronRight className="row-chevron" size={24} strokeWidth={2.25} aria-hidden="true" />
-            </button>
-          </article>
-        );
-      })}
+      {items.map(({ position, analysis }) => (
+        <article className="position-row" key={position.id}>
+          <button
+            className="position-select"
+            type="button"
+            onClick={() => onSelect(position.id)}
+          >
+            <span className="position-main">
+              <strong>{position.symbol}</strong>
+              <small>
+                {analysis.status} · {analysis.events.length}{" "}
+                {pluralize(analysis.events.length, "transaction")}
+              </small>
+            </span>
+            <span className="position-side">
+              <small>
+                {analysis.adjustedBasis === null
+                  ? "No share basis"
+                  : `${formatCurrency(analysis.adjustedBasis)} basis`}
+              </small>
+            </span>
+            <ChevronRight
+              className="row-chevron"
+              size={24}
+              strokeWidth={2.25}
+              aria-hidden="true"
+            />
+          </button>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PositionList({ positions, onSelect }) {
+  const groups = positions.reduce(
+    (acc, position) => {
+      const item = { position, analysis: analyzePosition(position) };
+      if (item.analysis.status === "Closed") acc.closed.push(item);
+      else acc.open.push(item);
+      return acc;
+    },
+    { open: [], closed: [] }
+  );
+
+  return (
+    <div className="position-groups">
+      {groups.open.length ? (
+        <section className="position-group" aria-labelledby="open-positions-title">
+          <div className="position-group-head">
+            <h3 id="open-positions-title">Open positions</h3>
+            <span>{groups.open.length}</span>
+          </div>
+          <PositionRows items={groups.open} onSelect={onSelect} />
+        </section>
+      ) : null}
+      {groups.closed.length ? (
+        <section className="position-group" aria-labelledby="closed-positions-title">
+          <div className="position-group-head">
+            <h3 id="closed-positions-title">Closed positions</h3>
+            <span>{groups.closed.length}</span>
+          </div>
+          <PositionRows items={groups.closed} onSelect={onSelect} />
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -536,26 +597,19 @@ function Modal({ title, children, onClose }) {
   }, []);
 
   useEffect(() => {
-    const scrollY = window.scrollY;
+    const htmlStyle = document.documentElement.style;
     const bodyStyle = document.body.style;
     const original = {
+      htmlOverflow: htmlStyle.overflow,
       overflow: bodyStyle.overflow,
-      position: bodyStyle.position,
-      top: bodyStyle.top,
-      width: bodyStyle.width,
     };
 
+    htmlStyle.overflow = "hidden";
     bodyStyle.overflow = "hidden";
-    bodyStyle.position = "fixed";
-    bodyStyle.top = `-${scrollY}px`;
-    bodyStyle.width = "100%";
 
     return () => {
+      htmlStyle.overflow = original.htmlOverflow;
       bodyStyle.overflow = original.overflow;
-      bodyStyle.position = original.position;
-      bodyStyle.top = original.top;
-      bodyStyle.width = original.width;
-      window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
     };
   }, []);
 
@@ -588,8 +642,10 @@ function Modal({ title, children, onClose }) {
   );
 }
 
-function TradeForm({ onAdd }) {
-  const [form, setForm] = useState(emptyEventForm);
+function TradeForm({ event: editingEvent, onSave }) {
+  const [form, setForm] = useState(() =>
+    editingEvent ? eventFormValues(editingEvent) : emptyEventForm()
+  );
   const [error, setError] = useState("");
   const meta = TRADE_TYPES[form.type];
   const isOption = meta.option;
@@ -653,8 +709,8 @@ function TradeForm({ onAdd }) {
       return;
     }
 
-    onAdd({
-      id: makeId("event"),
+    onSave({
+      id: editingEvent?.id || makeId("event"),
       type: form.type,
       date: form.date,
       contracts: isOption ? contracts : shares / CONTRACT_SIZE,
@@ -665,14 +721,16 @@ function TradeForm({ onAdd }) {
       note: form.note.trim(),
     });
 
-    setForm((current) => ({
-      ...emptyEventForm(),
-      type: current.type,
-      date: today(),
-      strike: "",
-      premium: "",
-      fees: current.fees || "0",
-    }));
+    if (!editingEvent) {
+      setForm((current) => ({
+        ...emptyEventForm(),
+        type: current.type,
+        date: today(),
+        strike: "",
+        premium: "",
+        fees: current.fees || "0",
+      }));
+    }
     setError("");
   };
 
@@ -787,13 +845,13 @@ function TradeForm({ onAdd }) {
 
       <button type="submit" className="primary-button wide-button">
         <ListPlus size={18} />
-        Add transaction
+        {editingEvent ? "Save changes" : "Add transaction"}
       </button>
     </form>
   );
 }
 
-function EventTimeline({ events, onDelete }) {
+function EventTimeline({ events, onEdit, onDelete }) {
   if (!events.length) {
     return (
       <div className="quiet-state">
@@ -824,7 +882,10 @@ function EventTimeline({ events, onDelete }) {
               </div>
               <div className="timeline-meta">
                 <span>{event.date}</span>
-                <span>{formatNumber(event.shares)} shares</span>
+                <span>
+                  {formatNumber(event.shares)}{" "}
+                  {pluralize(event.shares, "share")}
+                </span>
                 <span>{formatCurrency(parseNumber(event.strike))} strike</span>
                 {meta.option ? (
                   <span>
@@ -834,14 +895,24 @@ function EventTimeline({ events, onDelete }) {
               </div>
               {event.note ? <p>{event.note}</p> : null}
             </div>
-            <button
-              className="icon-button danger"
-              type="button"
-              aria-label="Delete transaction"
-              onClick={() => onDelete(event.id)}
-            >
-              <Trash2 size={16} />
-            </button>
+            <div className="timeline-actions">
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="Edit transaction"
+                onClick={() => onEdit(event)}
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                className="icon-button danger"
+                type="button"
+                aria-label="Delete transaction"
+                onClick={() => onDelete(event.id)}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </li>
         );
       })}
@@ -849,15 +920,23 @@ function EventTimeline({ events, onDelete }) {
   );
 }
 
-function ActivityList({ positions, onDeleteEvent }) {
+function ActivityList({ positions }) {
   const events = positions
     .flatMap((position) =>
-      (position.events || []).map((event) => ({ ...event, symbol: position.symbol, positionId: position.id }))
+      (position.events || []).map((event) => ({
+        ...event,
+        symbol: position.symbol,
+      }))
     )
     .sort((a, b) => eventSortValue(b, 0).localeCompare(eventSortValue(a, 0)));
 
   if (!events.length) {
-    return <div className="quiet-state"><CalendarDays size={22} /><span>No transactions yet</span></div>;
+    return (
+      <div className="quiet-state">
+        <CalendarDays size={22} />
+        <span>No transactions yet</span>
+      </div>
+    );
   }
 
   return (
@@ -870,17 +949,26 @@ function ActivityList({ positions, onDeleteEvent }) {
             <div className="timeline-copy">
               <div className="timeline-title">
                 <strong>{event.symbol} · {meta.label}</strong>
-                <span className={cashFlow >= 0 ? "positive" : "negative"}>{formatCurrency(cashFlow)}</span>
               </div>
               <div className="timeline-meta">
                 <span>{event.date}</span>
                 <span>{formatCurrency(parseNumber(event.strike))} strike</span>
-                {meta.option ? <span>{formatCurrency(parseNumber(event.premium))} premium</span> : <span>{formatNumber(event.shares)} shares</span>}
+                {!meta.option ? (
+                  <span>
+                    {formatNumber(event.shares)}{" "}
+                    {pluralize(event.shares, "share")}
+                  </span>
+                ) : null}
               </div>
             </div>
-            <button className="icon-button danger" type="button" aria-label="Delete transaction" onClick={() => onDeleteEvent(event.positionId, event.id)}>
-              <Trash2 size={16} />
-            </button>
+            <span
+              className={`activity-amount ${
+                cashFlow >= 0 ? "positive" : "negative"
+              }`}
+            >
+              <strong>{formatCurrency(cashFlow)}</strong>
+              <small>{meta.option ? "Premium" : "Cash flow"}</small>
+            </span>
           </li>
         );
       })}
@@ -894,7 +982,7 @@ function RecentActivity({ positions, onSeeMore }) {
       (position.events || []).map((event) => ({ ...event, symbol: position.symbol }))
     )
     .sort((a, b) => eventSortValue(b, 0).localeCompare(eventSortValue(a, 0)))
-    .slice(0, 3);
+    .slice(0, 4);
 
   if (!events.length) return null;
 
@@ -932,17 +1020,22 @@ function RecentActivity({ positions, onSeeMore }) {
 function PositionDetail({
   position,
   onAddEvent,
+  onEditEvent,
   onDeleteEvent,
   onBack,
   onDeletePosition,
 }) {
   const analysis = useMemo(() => analyzePosition(position), [position]);
   const hasShares = analysis.currentShares > 0;
+  const wheelPnl = analysis.closedWheelPnl ?? analysis.netPremium;
   const basisLabel = hasShares ? formatCurrency(analysis.adjustedBasis) : "--";
   const basisSubValue = hasShares
     ? `${formatCurrency(analysis.assignmentBasis)} after puts`
     : analysis.openPutContracts > 0
-    ? `${formatNumber(analysis.openPutContracts)} open put contracts`
+    ? `${formatNumber(analysis.openPutContracts)} open ${pluralize(
+        analysis.openPutContracts,
+        "put"
+      )} ${pluralize(analysis.openPutContracts, "contract")}`
     : "No assigned shares";
 
   return (
@@ -969,6 +1062,17 @@ function PositionDetail({
           </div>
           <div className="metrics-grid">
             <Metric
+              icon={LineChart}
+              label="Wheel P/L"
+              value={formatCurrency(wheelPnl)}
+              subValue={
+                analysis.closedWheelPnl === null
+                  ? "Realized to date"
+                  : "Closed wheel"
+              }
+              tone={wheelPnl >= 0 ? "positive" : "negative"}
+            />
+            <Metric
               icon={BadgeDollarSign}
               label="Net premiums"
               value={formatCurrency(analysis.netPremium)}
@@ -979,7 +1083,7 @@ function PositionDetail({
             />
             <Metric
               icon={WalletCards}
-              label="Current shares"
+              label={`Current ${pluralize(analysis.currentShares, "share")}`}
               value={formatNumber(analysis.currentShares)}
               subValue={
                 analysis.averageAssignedStrike === null
@@ -992,38 +1096,19 @@ function PositionDetail({
             />
             <Metric
               icon={ShieldCheck}
-              label="Open calls"
+              label={`Open ${pluralize(analysis.openCallContracts, "call")}`}
               value={formatNumber(analysis.openCallContracts)}
-              subValue="contracts"
+              subValue={pluralize(analysis.openCallContracts, "contract")}
               tone="neutral"
-            />
-            <Metric
-              icon={LineChart}
-              label={
-                analysis.closedWheelPnl === null
-                  ? "Net cash flow"
-                  : "Closed wheel P/L"
-              }
-              value={formatCurrency(
-                analysis.closedWheelPnl === null
-                  ? analysis.totalCashFlow
-                  : analysis.closedWheelPnl
-              )}
-              subValue={`${formatNumber(
-                analysis.openPutContracts
-              )} puts | ${formatNumber(analysis.openCallContracts)} calls open`}
-              tone={
-                (analysis.closedWheelPnl === null
-                  ? analysis.totalCashFlow
-                  : analysis.closedWheelPnl) >= 0
-                  ? "positive"
-                  : "negative"
-              }
             />
           </div>
         <section className="subsection detail-history">
           <div className="section-title"><CalendarDays size={18} /><h3>Transaction history</h3></div>
-          <EventTimeline events={[...analysis.events].reverse()} onDelete={onDeleteEvent} />
+          <EventTimeline
+            events={[...analysis.events].reverse()}
+            onEdit={onEditEvent}
+            onDelete={onDeleteEvent}
+          />
         </section>
         <button className="delete-position" type="button" onClick={onDeletePosition}>Delete position</button>
       </>
@@ -1032,6 +1117,22 @@ function PositionDetail({
 }
 
 function DataActions({ positions, onImport, onReset }) {
+  const [notice, setNotice] = useState(null);
+  const noticeTimer = useRef(null);
+
+  useEffect(
+    () => () => {
+      if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+    },
+    []
+  );
+
+  const showNotice = (message, tone = "success") => {
+    setNotice({ message, tone });
+    if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 3200);
+  };
+
   const exportData = () => {
     const blob = new Blob([JSON.stringify({ positions }, null, 2)], {
       type: "application/json",
@@ -1042,6 +1143,7 @@ function DataActions({ positions, onImport, onReset }) {
     anchor.download = `PeteWheeler-${today()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+    showNotice("Export started. Your backup is downloading.");
   };
 
   const importData = async (event) => {
@@ -1054,8 +1156,14 @@ function DataActions({ positions, onImport, onReset }) {
       if (!Array.isArray(parsed.positions))
         throw new Error("Missing positions array");
       onImport(parsed.positions);
+      showNotice(
+        `${parsed.positions.length} ${pluralize(
+          parsed.positions.length,
+          "position"
+        )} imported.`
+      );
     } catch {
-      window.alert("That file could not be imported.");
+      showNotice("That file could not be imported.", "error");
     } finally {
       event.target.value = "";
     }
@@ -1075,11 +1183,18 @@ function DataActions({ positions, onImport, onReset }) {
       <button
         className="secondary-button danger-text"
         type="button"
-        onClick={onReset}
+        onClick={() => {
+          if (onReset()) showNotice("All saved positions were reset.");
+        }}
       >
         <RotateCcw size={17} />
         Reset
       </button>
+      {notice ? (
+        <p className={`data-notice ${notice.tone}`} role="status">
+          {notice.message}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1089,6 +1204,7 @@ export default function App() {
   const [activeId, setActiveId] = useState("");
   const [screen, setScreen] = useState("home");
   const [modal, setModal] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
   const portfolio = useMemo(() => summarizePortfolio(positions), [positions]);
   const activePosition =
     positions.find((position) => position.id === activeId) ||
@@ -1140,6 +1256,35 @@ export default function App() {
     setModal(null);
   };
 
+  const saveEvent = (positionId, tradeEvent) => {
+    setPositions((current) =>
+      current.map((position) => {
+        if (position.id !== positionId) return position;
+
+        const alreadyExists = (position.events || []).some(
+          (event) => event.id === tradeEvent.id
+        );
+
+        return {
+          ...position,
+          events: alreadyExists
+            ? position.events.map((event) =>
+                event.id === tradeEvent.id ? tradeEvent : event
+              )
+            : [tradeEvent, ...(position.events || [])],
+        };
+      })
+    );
+    setEditingEvent(null);
+    setModal(null);
+  };
+
+  const editEvent = (positionId, tradeEvent) => {
+    setActiveId(positionId);
+    setEditingEvent({ positionId, event: tradeEvent });
+    setModal("transaction");
+  };
+
   const deleteEvent = (positionId, eventId) => {
     setPositions((current) =>
       current.map((position) =>
@@ -1162,9 +1307,10 @@ export default function App() {
   };
 
   const resetAll = () => {
-    if (!window.confirm("Reset all saved positions?")) return;
+    if (!window.confirm("Reset all saved positions?")) return false;
     setPositions([]);
     setActiveId("");
+    return true;
   };
 
   const importPositions = (importedPositions) => {
@@ -1217,23 +1363,29 @@ export default function App() {
           <section className="portfolio-strip" aria-label="Portfolio summary">
             <Metric
               icon={BadgeDollarSign}
-              label="Premium bank"
-              value={formatCurrency(portfolio.netPremium, true)}
-              subValue={`${positions.length} tracked`}
-              tone={portfolio.netPremium >= 0 ? "positive" : "negative"}
+              label="Wheel P/L"
+              value={formatCurrency(portfolio.wheelPnl, true)}
+              subValue={`${positions.length} ${pluralize(
+                positions.length,
+                "position"
+              )}`}
+              tone={portfolio.wheelPnl >= 0 ? "positive" : "negative"}
             />
             <Metric
               icon={WalletCards}
-              label="Assigned shares"
+              label={`Assigned ${pluralize(portfolio.currentShares, "share")}`}
               value={formatNumber(portfolio.currentShares)}
-              subValue={`${portfolio.assignedPositions} active`}
+              subValue={`${portfolio.assignedPositions} active ${pluralize(
+                portfolio.assignedPositions,
+                "position"
+              )}`}
               tone="neutral"
             />
             <Metric
               icon={ShieldCheck}
-              label="Open puts"
+              label={`Open ${pluralize(portfolio.openPutContracts, "put")}`}
               value={formatNumber(portfolio.openPutContracts)}
-              subValue="contracts"
+              subValue={pluralize(portfolio.openPutContracts, "contract")}
               tone="neutral"
             />
           </section>
@@ -1243,11 +1395,14 @@ export default function App() {
               <h2>At a glance</h2>
             </div>
             <div className="summary-card">
-              <span>Tracked positions</span>
+              <span>Tracked {pluralize(positions.length, "position")}</span>
               <strong>{positions.length}</strong>
               <small>
-                {portfolio.assignedPositions} holding shares ·{" "}
-                {portfolio.openPutContracts} puts open
+                {portfolio.assignedPositions} {pluralize(
+                  portfolio.assignedPositions,
+                  "share"
+                )} held · {portfolio.openPutContracts}{" "}
+                {pluralize(portfolio.openPutContracts, "put")} open
               </small>
             </div>
           </section>
@@ -1286,6 +1441,9 @@ export default function App() {
               if (deletePosition(activePosition.id)) setScreen("positions");
             }}
             onAddEvent={addEvent}
+            onEditEvent={(tradeEvent) =>
+              editEvent(activePosition.id, tradeEvent)
+            }
             onDeleteEvent={(eventId) => deleteEvent(activePosition.id, eventId)}
           />
         </main>
@@ -1293,7 +1451,7 @@ export default function App() {
 
       {screen === "activity" ? (
         <main className="screen-content">
-          <ActivityList positions={positions} onDeleteEvent={deleteEvent} />
+          <ActivityList positions={positions} />
         </main>
       ) : null}
 
@@ -1308,7 +1466,28 @@ export default function App() {
         <Modal title="Add position" onClose={() => setModal(null)}><PositionCreator onCreate={createPosition} /></Modal>
       ) : null}
       {modal === "transaction" ? (
-        <Modal title={`Add transaction · ${activePosition?.symbol || ""}`} onClose={() => setModal(null)}><TradeForm onAdd={addEvent} /></Modal>
+        <Modal
+          title={`${editingEvent ? "Edit" : "Add"} transaction · ${
+            editingEvent
+              ? positions.find(
+                  (position) => position.id === editingEvent.positionId
+                )?.symbol || ""
+              : activePosition?.symbol || ""
+          }`}
+          onClose={() => {
+            setEditingEvent(null);
+            setModal(null);
+          }}
+        >
+          <TradeForm
+            event={editingEvent?.event}
+            onSave={(tradeEvent) =>
+              editingEvent
+                ? saveEvent(editingEvent.positionId, tradeEvent)
+                : addEvent(tradeEvent)
+            }
+          />
+        </Modal>
       ) : null}
 
       {screen === "settings" ? (
