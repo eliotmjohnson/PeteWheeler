@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Swiper, SwiperSlide } from "swiper/react";
+import "swiper/css";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -9,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  DollarSign,
   LineChart,
   ListPlus,
   List,
@@ -636,7 +639,70 @@ function Modal({ title, children, onClose }) {
             <X size={19} />
           </button>
         </div>
-        {children}
+        {children(requestClose)}
+      </section>
+    </div>
+  );
+}
+
+function ConfirmationDialog({ title, message, confirmLabel, onCancel, onConfirm }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setIsOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const requestClose = (action) => {
+    if (isClosing) return;
+    setIsClosing(true);
+    window.setTimeout(action, 180);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") requestClose(onCancel);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isClosing, onCancel]);
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onMouseDown={() => requestClose(onCancel)}
+    >
+      <section
+        className={`confirmation-sheet ${isOpen && !isClosing ? "is-open" : ""} ${
+          isClosing ? "is-closing" : ""
+        }`}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-title"
+        aria-describedby="confirmation-message"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <h2 id="confirmation-title">{title}</h2>
+        <p id="confirmation-message">{message}</p>
+        <div className="confirmation-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={() => requestClose(onCancel)}
+          >
+            Cancel
+          </button>
+          <button
+            className="confirmation-button"
+            type="button"
+            onClick={() => requestClose(onConfirm)}
+          >
+            {confirmLabel}
+          </button>
+        </div>
       </section>
     </div>
   );
@@ -851,25 +917,72 @@ function TradeForm({ event: editingEvent, onSave }) {
   );
 }
 
-function EventTimeline({ events, onEdit, onDelete }) {
-  if (!events.length) {
-    return (
-      <div className="quiet-state">
-        <CalendarDays size={22} />
-        <span>No transactions</span>
-      </div>
-    );
-  }
+function SwipeableTransaction({ event, onEdit, onDelete }) {
+  const swiperRef = useRef(null);
+  const deleteTimer = useRef(null);
+  const itemRef = useRef(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const meta = TRADE_TYPES[event.type];
+  const Icon = meta.icon;
+  const cashFlow = eventCashFlow(event);
+
+  const resetSlide = () => swiperRef.current?.slideTo(1);
+
+  const completeEdit = () => {
+    resetSlide();
+    onEdit(event);
+  };
+
+  const completeDelete = () => {
+    if (isDeleting) return;
+
+    resetSlide();
+    const itemHeight = itemRef.current?.offsetHeight;
+    if (itemHeight) {
+      itemRef.current.style.setProperty("--transaction-height", `${itemHeight}px`);
+    }
+    setIsDeleting(true);
+    const deleteDuration = window.matchMedia("(prefers-reduced-motion: reduce)")
+      .matches
+      ? 20
+      : 440;
+    deleteTimer.current = window.setTimeout(() => onDelete(event.id), deleteDuration);
+  };
+
+  useEffect(
+    () => () => {
+      if (deleteTimer.current) window.clearTimeout(deleteTimer.current);
+    },
+    []
+  );
 
   return (
-    <ol className="timeline">
-      {events.map((event) => {
-        const meta = TRADE_TYPES[event.type];
-        const Icon = meta.icon;
-        const cashFlow = eventCashFlow(event);
-
-        return (
-          <li className={`timeline-item ${meta.side}`} key={event.id}>
+    <li
+      className={`swipeable-transaction${isDeleting ? " is-deleting" : ""}`}
+      ref={itemRef}
+    >
+      <Swiper
+        className="transaction-swiper"
+        initialSlide={1}
+        slidesPerView="auto"
+        resistanceRatio={0}
+        threshold={10}
+        onSwiper={(swiper) => {
+          swiperRef.current = swiper;
+        }}
+      >
+        <SwiperSlide className="transaction-action-slide">
+          <button
+            className="transaction-swipe-action edit"
+            type="button"
+            aria-label="Edit transaction"
+            onClick={completeEdit}
+          >
+            <Pencil size={25} />
+          </button>
+        </SwiperSlide>
+        <SwiperSlide className="transaction-content-slide">
+          <div className={`timeline-item ${meta.side}`}>
             <div className="timeline-icon" aria-hidden="true">
               <Icon size={16} />
             </div>
@@ -883,39 +996,52 @@ function EventTimeline({ events, onEdit, onDelete }) {
               <div className="timeline-meta">
                 <span>{event.date}</span>
                 <span>
-                  {formatNumber(event.shares)}{" "}
-                  {pluralize(event.shares, "share")}
+                  {formatNumber(event.shares)} {pluralize(event.shares, "share")}
                 </span>
                 <span>{formatCurrency(parseNumber(event.strike))} strike</span>
                 {meta.option ? (
-                  <span>
-                    {formatCurrency(parseNumber(event.premium))} premium
-                  </span>
+                  <span>{formatCurrency(parseNumber(event.premium))} premium</span>
                 ) : null}
               </div>
               {event.note ? <p>{event.note}</p> : null}
             </div>
-            <div className="timeline-actions">
-              <button
-                className="icon-button"
-                type="button"
-                aria-label="Edit transaction"
-                onClick={() => onEdit(event)}
-              >
-                <Pencil size={16} />
-              </button>
-              <button
-                className="icon-button danger"
-                type="button"
-                aria-label="Delete transaction"
-                onClick={() => onDelete(event.id)}
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </li>
-        );
-      })}
+          </div>
+        </SwiperSlide>
+        <SwiperSlide className="transaction-action-slide">
+          <button
+            className="transaction-swipe-action delete"
+            type="button"
+            aria-label="Delete transaction"
+            onClick={completeDelete}
+          >
+            <Trash2 size={25} />
+          </button>
+        </SwiperSlide>
+      </Swiper>
+    </li>
+  );
+}
+
+function EventTimeline({ events, onEdit, onDelete }) {
+  if (!events.length) {
+    return (
+      <div className="quiet-state">
+        <DollarSign size={34} />
+        <span>No transactions</span>
+      </div>
+    );
+  }
+
+  return (
+    <ol className="timeline">
+      {events.map((event) => (
+        <SwipeableTransaction
+          event={event}
+          key={event.id}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      ))}
     </ol>
   );
 }
@@ -933,7 +1059,7 @@ function ActivityList({ positions }) {
   if (!events.length) {
     return (
       <div className="quiet-state">
-        <CalendarDays size={22} />
+        <DollarSign size={34} />
         <span>No transactions yet</span>
       </div>
     );
@@ -1133,16 +1259,40 @@ function DataActions({ positions, onImport, onReset }) {
     noticeTimer.current = window.setTimeout(() => setNotice(null), 3200);
   };
 
-  const exportData = () => {
+  const exportData = async () => {
+    const filename = `PeteWheeler-${today()}.json`;
     const blob = new Blob([JSON.stringify({ positions }, null, 2)], {
       type: "application/json",
     });
+
+    const file = new File([blob], filename, { type: "application/json" });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "PeteWheeler backup",
+        });
+        showNotice("Your backup is ready to save or share.");
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          showNotice("Your backup could not be exported.", "error");
+        }
+      }
+      return;
+    }
+
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `PeteWheeler-${today()}.json`;
+    anchor.download = filename;
+    anchor.target = "_blank";
+    anchor.style.display = "none";
+    document.body.append(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => {
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }, 1000);
     showNotice("Export started. Your backup is downloading.");
   };
 
@@ -1155,10 +1305,14 @@ function DataActions({ positions, onImport, onReset }) {
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed.positions))
         throw new Error("Missing positions array");
-      onImport(parsed.positions);
+      const importedCount = onImport(parsed.positions);
+      if (!importedCount) {
+        showNotice("That file does not contain any valid positions.", "error");
+        return;
+      }
       showNotice(
-        `${parsed.positions.length} ${pluralize(
-          parsed.positions.length,
+        `${importedCount} ${pluralize(
+          importedCount,
           "position"
         )} imported.`
       );
@@ -1183,9 +1337,7 @@ function DataActions({ positions, onImport, onReset }) {
       <button
         className="secondary-button danger-text"
         type="button"
-        onClick={() => {
-          if (onReset()) showNotice("All saved positions were reset.");
-        }}
+        onClick={onReset}
       >
         <RotateCcw size={17} />
         Reset
@@ -1205,6 +1357,7 @@ export default function App() {
   const [screen, setScreen] = useState("home");
   const [modal, setModal] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
   const portfolio = useMemo(() => summarizePortfolio(positions), [positions]);
   const activePosition =
     positions.find((position) => position.id === activeId) ||
@@ -1233,15 +1386,20 @@ export default function App() {
     setPositions((current) => [position, ...current]);
     setActiveId(position.id);
     setScreen("positions");
-    setModal(null);
   };
 
-  const deletePosition = (positionId) => {
+  const deletePosition = (positionId, onDeleted) => {
     const position = positions.find((item) => item.id === positionId);
-    if (!position) return false;
-    if (!window.confirm(`Delete ${position.symbol}?`)) return false;
-    setPositions((current) => current.filter((item) => item.id !== positionId));
-    return true;
+    if (!position) return;
+    setConfirmation({
+      title: `Delete ${position.symbol}?`,
+      message: "This removes the position and its transaction history from this device.",
+      confirmLabel: "Delete position",
+      onConfirm: () => {
+        setPositions((current) => current.filter((item) => item.id !== positionId));
+        onDeleted?.();
+      },
+    });
   };
 
   const addEvent = (tradeEvent) => {
@@ -1253,7 +1411,6 @@ export default function App() {
           : position
       )
     );
-    setModal(null);
   };
 
   const saveEvent = (positionId, tradeEvent) => {
@@ -1275,8 +1432,6 @@ export default function App() {
         };
       })
     );
-    setEditingEvent(null);
-    setModal(null);
   };
 
   const editEvent = (positionId, tradeEvent) => {
@@ -1307,21 +1462,35 @@ export default function App() {
   };
 
   const resetAll = () => {
-    if (!window.confirm("Reset all saved positions?")) return false;
-    setPositions([]);
-    setActiveId("");
-    return true;
+    setConfirmation({
+      title: "Reset all saved positions?",
+      message: "This permanently removes every position and transaction saved on this device.",
+      confirmLabel: "Reset all",
+      onConfirm: () => {
+        setPositions([]);
+        setActiveId("");
+        setScreen("home");
+      },
+    });
   };
 
   const importPositions = (importedPositions) => {
-    const normalized = importedPositions.map((position) => ({
-      id: position.id || makeId("position"),
-      symbol: String(position.symbol || "").toUpperCase(),
-      createdAt: position.createdAt || new Date().toISOString(),
-      events: Array.isArray(position.events) ? position.events : [],
-    }));
-    setPositions(normalized.filter((position) => position.symbol));
-    setActiveId(normalized[0]?.id || "");
+    const normalized = importedPositions
+      .filter((position) => position && typeof position === "object")
+      .map((position) => ({
+        id: position.id || makeId("position"),
+        symbol: String(position.symbol || "").trim().toUpperCase(),
+        createdAt: position.createdAt || new Date().toISOString(),
+        events: Array.isArray(position.events) ? position.events : [],
+      }))
+      .filter((position) => position.symbol);
+
+    if (!normalized.length) return 0;
+
+    setPositions(normalized);
+    setActiveId(normalized[0].id);
+    setScreen("positions");
+    return normalized.length;
   };
 
   return (
@@ -1438,7 +1607,7 @@ export default function App() {
             position={activePosition}
             onBack={() => setScreen("positions")}
             onDeletePosition={() => {
-              if (deletePosition(activePosition.id)) setScreen("positions");
+              deletePosition(activePosition.id, () => setScreen("positions"));
             }}
             onAddEvent={addEvent}
             onEditEvent={(tradeEvent) =>
@@ -1463,7 +1632,16 @@ export default function App() {
       ) : null}
 
       {modal === "position" ? (
-        <Modal title="Add position" onClose={() => setModal(null)}><PositionCreator onCreate={createPosition} /></Modal>
+        <Modal title="Add position" onClose={() => setModal(null)}>
+          {(requestClose) => (
+            <PositionCreator
+              onCreate={(position) => {
+                createPosition(position);
+                requestClose();
+              }}
+            />
+          )}
+        </Modal>
       ) : null}
       {modal === "transaction" ? (
         <Modal
@@ -1479,14 +1657,19 @@ export default function App() {
             setModal(null);
           }}
         >
-          <TradeForm
-            event={editingEvent?.event}
-            onSave={(tradeEvent) =>
-              editingEvent
-                ? saveEvent(editingEvent.positionId, tradeEvent)
-                : addEvent(tradeEvent)
-            }
-          />
+          {(requestClose) => (
+            <TradeForm
+              event={editingEvent?.event}
+              onSave={(tradeEvent) => {
+                if (editingEvent) {
+                  saveEvent(editingEvent.positionId, tradeEvent);
+                } else {
+                  addEvent(tradeEvent);
+                }
+                requestClose();
+              }}
+            />
+          )}
         </Modal>
       ) : null}
 
@@ -1508,6 +1691,20 @@ export default function App() {
             />
           </section>
         </main>
+      ) : null}
+
+      {confirmation ? (
+        <ConfirmationDialog
+          title={confirmation.title}
+          message={confirmation.message}
+          confirmLabel={confirmation.confirmLabel}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => {
+            const action = confirmation.onConfirm;
+            setConfirmation(null);
+            action();
+          }}
+        />
       ) : null}
 
       <nav className="tab-bar" aria-label="Main navigation">

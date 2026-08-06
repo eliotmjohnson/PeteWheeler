@@ -5,7 +5,7 @@
 - Mobile-first React + Vite app for tracking wheel strategy positions.
 - Record option transactions, assignments, called-away shares, premiums, adjusted share cost, and wheel P/L.
 - Persist user data in browser localStorage under `wheel-cost-tracker:v1`.
-- Keep dependencies minimal; do not add a library for small UI behavior.
+- Keep dependencies minimal; do not add a library for small UI behavior. `swiper` is the deliberate exception for transaction-history swipe actions.
 
 ## Structure
 
@@ -20,6 +20,9 @@
 - Position details contain the ticker, metrics, and transaction history. Transaction creation uses a floating `+` button and sheet.
 - Activity is a date-sorted, ungrouped, read-only transaction list that always includes the ticker.
 - More contains local data export, import, and reset controls with inline success or error notices.
+- More: successful imports navigate to Positions; malformed or empty imports stay on More with an inline error. A confirmed reset returns Home. Export uses the native file share flow where available; iOS may reload a Home Screen web app after this system handoff, so Home is the intentional reload destination.
+- Position-detail transaction rows use compact Swiper actions: Edit is on the left and Delete is on the right. Reset the row after either action, and animate a deletion off-screen before collapsing its height.
+- Use the in-app confirmation sheet for destructive position deletion and reset actions; do not use browser `alert`, `confirm`, or `prompt` dialogs.
 - Use native date inputs; do not layer a custom calendar icon over them.
 - Inputs must be at least 16px to prevent iOS focus zoom.
 - Modal sheets must keep the background page fixed and must not use a dimmed backdrop.
@@ -46,6 +49,6 @@
 ## Caching and release
 
 - `public/sw.js` uses cache-first handling for non-navigation assets. Navigation and `index.html` must remain network-first.
-- The current cache name is `petewheeler-v10`. Bump it when a deployment needs a clean offline cache; it is not required for every routine Vite asset deployment.
+- The current cache name is `petewheeler-v11`. Bump it when a deployment needs a clean offline cache; it is not required for every routine Vite asset deployment.
 - The iOS Home Screen app’s name and icon metadata do not update from a new manifest alone. Reinstalling changes that metadata, so export local data first and import it afterward.
 - Start local development with `npm run dev`; build production assets with `npm run build`.
